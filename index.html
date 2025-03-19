@@ -17,12 +17,31 @@
 
     <div id="list">
       <h2>My Todos:</h2>
-      <ul id="tasks">
+      <ul id="tasks">Wash the dishes
       </ul>
     </div>
 
-    <script src="./src/index.js"></script>
-  </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", function() {
+        var form = document.getElementById("create-task-form");
+        var taskList = document.getElementById("tasks");
 
+        form.addEventListener("submit", function(event) {
+          event.preventDefault(); // Stop the page from refreshing
+
+          var taskInput = document.getElementById("new-task-description");
+          var taskText = taskInput.value;
+          
+          if (taskText !== "") {
+            var newTask = document.createElement("li");
+            newTask.innerText = taskText;
+            taskList.appendChild(newTask);
+            taskInput.value = ""; // Clear input field
+          }
+        });
+      });
+    </script>
+  </div>
 </body>
 </html>
+
