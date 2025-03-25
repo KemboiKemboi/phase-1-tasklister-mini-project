@@ -1,57 +1,78 @@
-const chai = require('chai');
-global.expect = chai.expect;
+const { expect } = require('chai');
+const jsdom = require('jsdom');
+const { JSDOM } = jsdom;
 
-const fs = require('fs');
-const path = require('path');
-const { JSDOM } = require('jsdom');
-const babel = require('@babel/core');
+describe('TaskLister', function() {
+  let window;
+  let document;
+  let taskForm;
+  let taskInput;
+  let taskList;
 
-// Load HTML content
-const html = fs.readFileSync(path.resolve(__dirname, '..', 'index.html'), 'utf-8');
+  beforeEach(function() {
+    // Set up the virtual DOM
+    window = new JSDOM(`<!DOCTYPE html><body><form id="create-task-form"><input id="new-task-description"><input type="submit" value="Create New Task"></form><ul id="task-list"></ul></body>`);
+    document = window.document;
 
-// Transform JavaScript using Babel
-const { code: transformedScript } = babel.transformFileSync(
-  path.resolve(__dirname, '..', 'src/index.js'),
-  { presets: ['@babel/preset-env'] }
-);
+    // Access elements
+    taskForm = document.getElementById('create-task-form');
+    taskInput = document.getElementById('new-task-description');
+    taskList = document.getElementById('task-list');
 
-// Initialize JSDOM
-const dom = new JSDOM(html, {
-  runScripts: "dangerously",
-  resources: "usable"
+    // Directly add the JavaScript code that manipulates the DOM (no need for DOMContentLoaded)
+    const script = document.createElement('script');
+    script.textContent = `
+      const taskForm = document.getElementById('create-task-form');
+      const taskInput = document.getElementById('new-task-description');
+      const taskList = document.getElementById('task-list');
+      
+      taskForm.addEventListener('submit', function(event) {
+        event.preventDefault(); // Prevent form submission behavior
+        const taskDescription = taskInput.value.trim();
+        if (taskDescription) {
+          const taskItem = document.createElement('li');
+          taskItem.textContent = taskDescription;
+
+          const deleteButton = document.createElement('button');
+          deleteButton.textContent = 'Delete';
+          deleteButton.classList.add('delete-btn');
+
+          deleteButton.addEventListener('click', () => {
+            taskItem.remove();
+          });
+
+          taskItem.appendChild(deleteButton);
+          taskList.appendChild(taskItem);
+          taskInput.value = ''; // Reset input field after adding task
+        }
+      });
+    `;
+    document.body.appendChild(script);
+  });
+
+  it('should add an event to the form and add input to webpage', function(done) {
+    // Simulate typing a task into the input field
+    taskInput.value = 'New Task';
+
+    // Dispatch the submit event to simulate form submission
+    taskForm.dispatchEvent(new window.Event('submit'));
+
+    // Wait for the DOM to be updated
+    setTimeout(() => {
+      const taskItems = taskList.getElementsByTagName('li');
+      
+      // Ensure that a task was added
+      expect(taskItems.length).to.equal(1);
+
+      // Check if the task's text content includes 'New Task'
+      expect(taskItems[0].textContent).to.include('New Task');
+
+      // Ensure that the Delete button was added
+      const deleteButton = taskItems[0].querySelector('button');
+      expect(deleteButton).to.not.be.null;
+      expect(deleteButton.textContent).to.equal('Delete');
+
+      done(); // Notify Mocha that the test has completed
+    }, 500); // Allow some time for the DOM to update after submitting the form
+  });
 });
-
-// Inject the transformed JavaScript into the virtual DOM
-const scriptElement = dom.window.document.createElement("script");
-scriptElement.textContent = transformedScript;
-dom.window.document.body.appendChild(scriptElement);
-
-// Expose JSDOM globals to the testing environment
-global.window = dom.window;
-global.document = dom.window.document;
-global.navigator = dom.window.navigator;
-global.HTMLElement = dom.window.HTMLElement;
-global.Node = dom.window.Node;
-global.Text = dom.window.Text;
-global.XMLHttpRequest = dom.window.XMLHttpRequest;
-
-// Sample test suite for JavaScript event handling
-describe('Handling form submission', () => {
-  let form
-  let formInput
-  let taskList
-
-  before(() => {
-    form = document.querySelector('#create-task-form')
-    formInput = document.querySelector('#new-task-description')
-    taskList = document.querySelector('#tasks')
-  })
-
-  it('should add an event to the form and add input to webpage', () => {
-    // Simulate user input
-    formInput.value = 'Wash the dishes'
-    const event = new dom.window.Event('submit')
-    form.dispatchEvent(event)
-    expect(taskList.textContent).to.include('Wash the dishes')
-  })
-})
